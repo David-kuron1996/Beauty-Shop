@@ -1,5 +1,5 @@
 from sqlalchemy import Column,String,Integer,Boolean,DateTime
-from sqlachemy.orm import relationship
+from sqlalchemy.orm import relationship
 from app.db.base import Base
 from sqlalchemy.sql import func
 
@@ -13,3 +13,6 @@ class User(Base):
     is_Admin=Column(Boolean,default=False)
     is_Active =Column(Boolean,default=False)
     created_at=Column(DateTime(timezone=True), server_default=func.now())
+    
+    #relationship
+    orders = relationship("Order",back_populates="user")

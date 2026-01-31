@@ -1,0 +1,28 @@
+/* 1. Import Google Fonts */
+@import url('https://fonts.googleapis.com/css2?family=Lato:wght@300;400;700&family=Playfair+Display:wght@400;500;600;700&display=swap');
+
+/* 2. Import Tailwind v4 */
+@import "tailwindcss";
+
+/* 3. Configure Theme (This replaces tailwind.config.js) */
+@theme {
+  /* Override the default fonts */
+  --font-sans: 'Lato', sans-serif;
+  --font-serif: 'Playfair Display', serif;
+
+  /* Add your custom brand colors */
+  --color-brand-pink: #FFF5F5;
+  --color-brand-gold: #C48F65;
+  --color-brand-dark: #333333;
+}
+
+/* 4. Global Styles */
+/* In v4, basic resets are included, but you can add specific overrides here */
+body {
+  font-family: var(--font-sans);
+  color: var(--color-brand-dark);
+}
+
+h1, h2, h3, h4, h5, h6 {
+  font-family: var(--font-serif);
+}

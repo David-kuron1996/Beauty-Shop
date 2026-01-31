@@ -1,0 +1,18 @@
+:root {
+  /* Premium Palette from the Design */
+  --color-primary: #333333;      /* Dark Charcoal for text */
+  --color-secondary: #C48F65;    /* Gold/Bronze accent */
+  --color-background: #FDFBF9;   /* Off-white paper texture look */
+  --color-soft-pink: #FCEDEE;    /* Hero background pink */
+  --color-white: #FFFFFF;
+  --color-grey-light: #F5F5F5;
+  
+  /* Typography */
+  --font-heading: 'Playfair Display', serif; /* Elegant Serif */
+  --font-body: 'Lato', sans-serif;           /* Clean Sans-serif */
+  
+  /* Spacing & Borders */
+  --radius-btn: 30px;
+  --radius-card: 12px;
+  --shadow-soft: 0 4px 20px rgba(0,0,0,0.05);
+}

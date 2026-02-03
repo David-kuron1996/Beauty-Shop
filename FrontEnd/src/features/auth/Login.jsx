@@ -7,7 +7,8 @@ import { loginStart, loginSuccess } from './authSlice';
 const Login = () => {
   const [formData, setFormData] = useState({
     email: '',
-    password: ''
+    password: '',
+    userType: 'customer' // 'customer' or 'admin'
   });
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
@@ -34,12 +35,19 @@ const Login = () => {
         lastName: 'Johnson',
         email: formData.email,
         phone: '+1 (555) 123-4567',
-        address: '123 Beauty Lane, Glow City, GC 12345'
+        address: '123 Beauty Lane, Glow City, GC 12345',
+        role: formData.userType === 'admin' || formData.email === 'admin@bloombeauty.com' ? 'admin' : 'customer'
       };
       
       dispatch(loginSuccess(mockUser));
       setIsLoading(false);
-      navigate('/profile');
+      
+      // Redirect based on role
+      if (formData.userType === 'admin') {
+        navigate('/admin');
+      } else {
+        navigate('/');
+      }
     }, 1500);
   };
 
@@ -68,6 +76,35 @@ const Login = () => {
         {/* Form */}
         <div className="bg-white rounded-2xl shadow-xl p-8 border border-gray-100">
           <form onSubmit={handleSubmit} className="space-y-6">
+            
+            {/* User Type Selection */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-3">Login as</label>
+              <div className="grid grid-cols-2 gap-3">
+                <button
+                  type="button"
+                  onClick={() => setFormData({...formData, userType: 'customer'})}
+                  className={`p-3 border-2 rounded-xl text-sm font-medium transition-all ${
+                    formData.userType === 'customer'
+                      ? 'border-pink-500 bg-pink-50 text-pink-700'
+                      : 'border-gray-200 text-gray-600 hover:border-gray-300'
+                  }`}
+                >
+                  Customer
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setFormData({...formData, userType: 'admin'})}
+                  className={`p-3 border-2 rounded-xl text-sm font-medium transition-all ${
+                    formData.userType === 'admin'
+                      ? 'border-pink-500 bg-pink-50 text-pink-700'
+                      : 'border-gray-200 text-gray-600 hover:border-gray-300'
+                  }`}
+                >
+                  Admin
+                </button>
+              </div>
+            </div>
             
             {/* Email Field */}
             <div>

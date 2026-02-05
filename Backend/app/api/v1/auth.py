@@ -8,21 +8,24 @@ router = APIRouter(prefix="/api/v1/auth", tags=["auth"])
 
 @router.post("/register", response_model=security.Token, status_code=status.HTTP_201_CREATED)
 def register(user_in: UserCreate, db=Depends(security.get_db)):
-    # check existing user
+    # 1. Check if user exists
     existing = security.get_user_by_email(db, user_in.email)
     if existing:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Email already registered")
+        raise HTTPException(status_code=400, detail="Email already registered")
     
+    # 2. Hash the password
     hashed = security.get_password_hash(user_in.password)
+    
+    # 3. Create user (Only use fields present in UserCreate or your DB model)
     user = User(
-        first_name=user_in.first_name,
-        last_name=user_in.last_name,
         email=user_in.email,
-        phone=user_in.phone,
-        address=user_in.address,
+        # Note: If your DB model has first_name/last_name, 
+        # you'll need to split fullname or update the DB model too!
+        full_name=user_in.fullname, 
         hashed_password=hashed,
         is_Active=True
     )
+    
     db.add(user)
     db.commit()
     db.refresh(user)

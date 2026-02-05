@@ -1,10 +1,7 @@
 from fastapi import FastAPI
+from app.api.v1.auth import router as auth_router # Or wherever your auth file is
 
-app=FastAPI()
+app = FastAPI()
 
-
-@app.get("/")
-def home():
-    return {"Status": "Success", "message": "Beauty Shop API is running!"}
-        
-    
+# This is the part that connects your code to the URL
+app.include_router(auth_router)

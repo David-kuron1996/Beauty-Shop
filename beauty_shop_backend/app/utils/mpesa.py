@@ -17,26 +17,19 @@ def get_access_token():
     raise HTTPException(status_code=500, detail="Failed to fetch M-Pesa token")
 
 def initiate_stk_push(phone: str, amount: int, invoice_no: str):
+    # 1. Access Token
     access_token = get_access_token()
     timestamp = datetime.now().strftime('%Y%m%d%H%M%S')
     
-    # --- PHONE NUMBER SANITIZATION ---
-    # 1. Convert to string and strip spaces
+    # 2. Format Phone Number (Handle None, 07..., +254...)
+    if not phone:
+        return {"errorCode": "400", "errorMessage": "PhoneNumber is None"}
+        
     clean_phone = str(phone).strip().replace("+", "")
-    
-    # 2. Convert 07... or 01... to 254...
     if clean_phone.startswith("0"):
         clean_phone = "254" + clean_phone[1:]
     
-    # 3. Final validation: must be digits and correct length
-    if not clean_phone.isdigit() or len(clean_phone) != 12:
-        return {
-            "errorCode": "400.002.02",
-            "errorMessage": f"Bad Request - Invalid PhoneNumber Format: {clean_phone}"
-        }
-    # ---------------------------------
-
-    # Password must be Base64(ShortCode + Passkey + Timestamp)
+    # 3. Security Credentials
     password_str = BUSINESS_SHORTCODE + PASSKEY + timestamp
     password = base64.b64encode(password_str.encode()).decode('utf-8')
     

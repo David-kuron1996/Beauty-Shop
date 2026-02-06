@@ -1,11 +1,25 @@
 from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi.security import OAuth2PasswordBearer
 from sqlalchemy.orm import Session
+from jose import JWTError, jwt
 from app.database import get_db
 from app.models import User
 from app.schemas import UserCreate, Token
-from app.services.auth_service import hash_password, verify_password, create_access_token
+# Ensure these are correctly defined in your auth_service.py
+from app.services.auth_service import (
+    hash_password, 
+    verify_password, 
+    create_access_token, 
+    SECRET_KEY, 
+    ALGORITHM
+)
 
 router = APIRouter()
+
+# This tells FastAPI where to look for the token (the login endpoint)
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="api/auth/login")
+
+# --- Authentication Logic ---
 
 @router.post("/register", response_model=Token)
 def register(user_data: UserCreate, db: Session = Depends(get_db)):
@@ -16,11 +30,39 @@ def register(user_data: UserCreate, db: Session = Depends(get_db)):
     db.add(new_user)
     db.commit()
     db.refresh(new_user)
-    return {"access_token": create_access_token({"sub": new_user.email}), "token_type": "bearer"}
+    
+    access_token = create_access_token(data={"sub": new_user.email})
+    return {"access_token": access_token, "token_type": "bearer"}
 
 @router.post("/login", response_model=Token)
 def login(user_data: UserCreate, db: Session = Depends(get_db)):
     user = db.query(User).filter(User.email == user_data.email).first()
     if not user or not verify_password(user_data.password, user.password):
         raise HTTPException(status_code=401, detail="Invalid credentials")
-    return {"access_token": create_access_token({"sub": user.email}), "token_type": "bearer"}
+    
+    access_token = create_access_token(data={"sub": user.email})
+    return {"access_token": access_token, "token_type": "bearer"}
+
+# --- Dependency Logic (The Missing Piece) ---
+
+def get_current_user(token: str = Depends(oauth2_scheme), db: Session = Depends(get_db)):
+    """
+    Decodes the JWT token to identify the user for protected routes like Cart and Orders.
+    """
+    credentials_exception = HTTPException(
+        status_code=status.HTTP_401_UNAUTHORIZED,
+        detail="Could not validate credentials",
+        headers={"WWW-Authenticate": "Bearer"},
+    )
+    try:
+        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        email: str = payload.get("sub")
+        if email is None:
+            raise credentials_exception
+    except JWTError:
+        raise credentials_exception
+        
+    user = db.query(User).filter(User.email == email).first()
+    if user is None:
+        raise credentials_exception
+    return user

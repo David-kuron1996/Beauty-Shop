@@ -1,88 +1,72 @@
-from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks
+from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
-from pydantic import BaseModel  # Added for Option A
+from typing import List
 from app.database import get_db
-from app.models import User, Order, CartItem
+from app.models import Order, OrderItem, CartItem, User
+from app.schemas import OrderResponse
 from app.routes.auth import get_current_user
-from app.utils.mpesa import initiate_stk_push
-from app.utils.invoice import generate_invoice_pdf
-from app.utils.email import send_invoice_email
 import uuid
 
-# 1. Define the schema to fetch phone number from the request body
-class CheckoutRequest(BaseModel):
-    phone_number: str
+router = APIRouter(prefix="/api/v1/orders", tags=["orders"])
 
-router = APIRouter()
-
-@router.post("/checkout")
-def checkout(
-    payload: CheckoutRequest, # Now we fetch data from the customer's request
-    background_tasks: BackgroundTasks, 
-    db: Session = Depends(get_db), 
+@router.post("/", response_model=OrderResponse, status_code=status.HTTP_201_CREATED)
+def create_order(
+    db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
-    # 1. Validate Cart
+    # Get cart items
     cart_items = db.query(CartItem).filter(CartItem.user_id == current_user.id).all()
     if not cart_items:
         raise HTTPException(status_code=400, detail="Cart is empty")
-
-    # 2. Get Phone Number from the Request (No more hardcoding!)
-    user_phone = payload.phone_number 
-
-    # 3. Build Detailed Items List
-    items_for_pdf = []
-    for item in cart_items:
-        items_for_pdf.append({
-            "name": item.product.name,
-            "quantity": item.quantity,
-            "price": item.product.price
-        })
-
-    # 4. Financials
-    total = sum(item.product.price * item.quantity for item in cart_items)
-    invoice_no = f"INV-{uuid.uuid4().hex[:6].upper()}"
     
-    # 5. Save Order & Clear Cart
+    # Calculate total
+    total_amount = sum(item.product.price * item.quantity for item in cart_items)
+    
+    # Create order
     new_order = Order(
         user_id=current_user.id,
-        total_amount=total,
-        invoice_number=invoice_no,
+        total_amount=total_amount,
+        invoice_number=f"INV-{uuid.uuid4().hex[:8].upper()}",
         status="pending"
     )
     db.add(new_order)
-    
-    db.query(CartItem).filter(CartItem.user_id == current_user.id).delete()
     db.commit()
     db.refresh(new_order)
-
-    # 6. Generate PDF Invoice
-    pdf_path = generate_invoice_pdf(invoice_no, total, current_user.email, items_for_pdf)
-
-    # 7. M-Pesa Trigger using the dynamic phone number
-    try:
-        mpesa_response = initiate_stk_push(
-            phone=user_phone,
-            amount=int(total),
-            invoice_no=invoice_no
+    
+    # Create order items
+    for item in cart_items:
+        order_item = OrderItem(
+            order_id=new_order.id,
+            product_id=item.product_id,
+            quantity=item.quantity,
+            price_at_purchase=item.product.price
         )
-    except Exception as e:
-        mpesa_response = {"error": "M-Pesa Service Unavailable", "details": str(e)}
+        db.add(order_item)
+    
+    # Clear cart
+    db.query(CartItem).filter(CartItem.user_id == current_user.id).delete()
+    db.commit()
+    
+    return new_order
 
-    # 8. Send Email in Background
-    background_tasks.add_task(
-        send_invoice_email, 
-        recipient_email=current_user.email, 
-        invoice_no=invoice_no, 
-        pdf_path=pdf_path
-    )
+@router.get("/", response_model=List[OrderResponse])
+def get_my_orders(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    return db.query(Order).filter(Order.user_id == current_user.id).order_by(Order.created_at.desc()).all()
 
-    return {
-        "message": "Checkout initiated.",
-        "order_details": {
-            "invoice": invoice_no, 
-            "total": total,
-            "items": items_for_pdf
-        },
-        "mpesa_status": mpesa_response
-    }
+@router.get("/{order_id}", response_model=OrderResponse)
+def get_order(
+    order_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    order = db.query(Order).filter(Order.id == order_id).first()
+    if not order:
+        raise HTTPException(status_code=404, detail="Order not found")
+        
+    if order.user_id != current_user.id and not getattr(current_user, 'is_admin', False):
+        raise HTTPException(status_code=403, detail="Not authorized")
+        
+    return order

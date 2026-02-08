@@ -1,8 +1,9 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
-from app.core.security import get_db
+from app.db.session import get_db
 from app.schemas.mpesa import MpesaPaymentRequest, MpesaCallbackResponse, MpesaTransactionStatus
 from app.services.mpesa_service import mpesa_service
+from app.models.order import Order
 from typing import Optional
 
 router = APIRouter(prefix="/api/v1/mpesa", tags=["mpesa"])
@@ -17,12 +18,13 @@ async def initiate_stk_push(
     """
     try:
         # Get order details from database
-        # order = db.query(Order).filter(Order.id == payment_request.order_id).first()
-        # if not order:
-        #     raise HTTPException(status_code=404, detail="Order not found")
+        order = db.query(Order).filter(Order.id == payment_request.order_id).first()
+        if not order:
+            raise HTTPException(status_code=404, detail="Order not found")
         
-        # For now, use a dummy amount - replace with actual order total
-        amount = 1  # Replace with order.total_amount
+        if not order.total_amount or order.total_amount <= 0:
+            raise HTTPException(status_code=400, detail="Invalid order amount")
+        amount = int(order.total_amount) # Ensure amount is an integer for M-Pesa
         
         result = mpesa_service.initiate_stk_push(
             phone_number=payment_request.phone_number,
@@ -32,8 +34,8 @@ async def initiate_stk_push(
         
         if result.get("ResponseCode") == "0":
             # Save checkout request ID to order
-            # order.mpesa_checkout_id = result.get("CheckoutRequestID")
-            # db.commit()
+            order.mpesa_checkout_id = result.get("CheckoutRequestID")
+            db.commit()
             
             return {
                 "success": True,
@@ -51,7 +53,10 @@ async def initiate_stk_push(
         raise HTTPException(status_code=500, detail=f"Payment initiation failed: {str(e)}")
 
 @router.post("/callback")
-async def mpesa_callback(callback_data: dict):
+async def mpesa_callback(
+    callback_data: dict,
+    db: Session = Depends(get_db)
+):
     """
     Handle M-Pesa callback response
     This endpoint should be publicly accessible
@@ -80,12 +85,12 @@ async def mpesa_callback(callback_data: dict):
                     phone_number = item.get("Value")
             
             # Update order in database
-            # order = db.query(Order).filter(Order.mpesa_checkout_id == checkout_request_id).first()
-            # if order:
-            #     order.status = "paid"
-            #     order.mpesa_receipt = receipt_number
-            #     order.phone_number = phone_number
-            #     db.commit()
+            order = db.query(Order).filter(Order.mpesa_checkout_id == checkout_request_id).first()
+            if order:
+                order.status = "paid"
+                order.mpesa_receipt = receipt_number
+                order.phone_number = phone_number
+                db.commit()
             
             return {
                 "ResultCode": 0,

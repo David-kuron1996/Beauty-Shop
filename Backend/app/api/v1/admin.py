@@ -19,7 +19,7 @@ def get_dashboard_stats(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
-    if not getattr(current_user, 'is_admin', False):
+    if not getattr(current_user, 'is_Admin', False):
         raise HTTPException(status_code=403, detail="Not authorized")
     
     # Get stats
@@ -41,7 +41,7 @@ def get_recent_orders(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
-    if not current_user.is_Admin:
+    if not getattr(current_user, 'is_Admin', False):
         raise HTTPException(status_code=403, detail="Not authorized")
     
     orders = db.query(Order).join(User).order_by(Order.created_at.desc()).limit(limit).all()
@@ -64,7 +64,7 @@ def get_top_products(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
-    if not current_user.is_Admin:
+    if not getattr(current_user, 'is_Admin', False):
         raise HTTPException(status_code=403, detail="Not authorized")
     
     # Get top products by sales
@@ -92,7 +92,7 @@ def create_user(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
-    if not current_user.is_Admin:
+    if not getattr(current_user, 'is_Admin', False):
         raise HTTPException(status_code=403, detail="Not authorized")
     
     # Check if email already exists
@@ -124,7 +124,7 @@ def get_user(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
-    if not current_user.is_Admin:
+    if not getattr(current_user, 'is_Admin', False):
         raise HTTPException(status_code=403, detail="Not authorized")
     
     user = db.query(User).filter(User.id == user_id).first()
@@ -132,6 +132,7 @@ def get_user(
         raise HTTPException(status_code=404, detail="User not found")
     
     return user
+
 @router.get("/users", response_model=List[UserOut])
 def get_all_users(
     skip: int = 0,
@@ -139,7 +140,7 @@ def get_all_users(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
-    if not current_user.is_Admin:
+    if not getattr(current_user, 'is_Admin', False):
         raise HTTPException(status_code=403, detail="Not authorized")
     
     users = db.query(User).offset(skip).limit(limit).all()
@@ -152,7 +153,7 @@ def update_user(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
-    if not current_user.is_Admin:
+    if not getattr(current_user, 'is_Admin', False):
         raise HTTPException(status_code=403, detail="Not authorized")
     
     user = db.query(User).filter(User.id == user_id).first()
@@ -176,7 +177,7 @@ def delete_user(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
-    if not current_user.is_Admin:
+    if not getattr(current_user, 'is_Admin', False):
         raise HTTPException(status_code=403, detail="Not authorized")
     
     user = db.query(User).filter(User.id == user_id).first()
@@ -196,7 +197,7 @@ def toggle_admin_status(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
-    if not current_user.is_Admin:
+    if not getattr(current_user, 'is_Admin', False):
         raise HTTPException(status_code=403, detail="Not authorized")
     
     user = db.query(User).filter(User.id == user_id).first()
@@ -214,7 +215,7 @@ def get_sales_analytics(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
-    if not current_user.is_Admin:
+    if not getattr(current_user, 'is_Admin', False):
         raise HTTPException(status_code=403, detail="Not authorized")
     
     from datetime import datetime, timedelta
@@ -225,7 +226,7 @@ def get_sales_analytics(
     # Get daily sales for the period
     daily_sales = db.query(
         func.date(Order.created_at).label('date'),
-        func.sum(Order.total_price).label('total'),
+        func.sum(Order.total_amount).label('total'),
         func.count(Order.id).label('orders')
     ).filter(
         Order.created_at >= start_date,
@@ -250,7 +251,7 @@ def export_orders_report(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
-    if not current_user.is_Admin:
+    if not getattr(current_user, 'is_Admin', False):
         raise HTTPException(status_code=403, detail="Not authorized")
     
     orders = db.query(Order).join(User).all()
@@ -272,7 +273,7 @@ def export_orders_report(
                 f"{order.user.first_name} {order.user.last_name}",
                 order.user.email,
                 order.created_at.strftime('%Y-%m-%d'),
-                float(order.total_price),
+                float(order.total_amount),
                 order.status
             ])
         
